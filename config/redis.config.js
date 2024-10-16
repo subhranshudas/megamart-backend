@@ -69,9 +69,14 @@ class RedisService {
    * @throws Will throw an error if the client is not initialized or not connected.
    */
   getClient() {
-    if (!this.client || !this.isConnected) {
-      throw new Error("Redis client not initialized or not connected");
+    if (!this.client) {
+      throw new Error("Redis client not initialized");
     }
+
+    if (!this.isConnected) {
+      throw new Error("Redis client not connected");
+    }
+
     return this.client;
   }
 }

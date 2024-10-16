@@ -1,7 +1,6 @@
 const express = require("express");
 
 const User = require("../models/user");
-const bcrypt = require("bcrypt");
 const { z } = require("zod");
 
 const router = express.Router();
@@ -46,6 +45,79 @@ router.post("/register", async (req, res) => {
     console.error("Error: API /register: \n", JSON.stringify(err));
     res.status(500).json({ error: err?.message });
   }
+});
+
+/**
+ * User login API route
+ */
+
+// Login schema
+const loginSchema = z.object({
+  email: z.string().email("Invalid email address"),
+  password: z.string(),
+});
+
+// Login route
+router.post("/login", async (req, res) => {
+  try {
+    const result = loginSchema.safeParse(req.body);
+
+    if (!result.success) {
+      return res.status(400).json({ errors: result.error.errors });
+    }
+
+    const { email, password } = result.data;
+
+    // Find user in database
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(400).json({ message: "Invalid email" });
+    }
+
+    // Compare passwords
+    const isMatch = await user.comparePassword(password);
+
+    if (!isMatch) {
+      return res.status(400).json({ message: "Invalid password" });
+    }
+    // Set user session
+    req.session.userId = user._id; // Store the user's ID in the session
+
+    // Save session explicitly
+    req.session.save((err) => {
+      if (err) {
+        console.error("Session save error:", err);
+        return res
+          .status(500)
+          .json({ message: "Error logging in because of session" });
+      }
+      res.status(200).json({ message: "Logged in successfully" });
+    });
+  } catch (err) {
+    console.error("Error in /login route:", err);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// Logout route
+router.post("/logout", (req, res) => {
+  // destroy session
+  req.session.destroy((err) => {
+    if (err) {
+      return res.status(500).json({ message: "Error logging out" });
+    }
+
+    // Clear the session cookie
+    res.clearCookie("megamart.sid", {
+      path: "/",
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+    });
+
+    res.json({ message: "Logged out successfully" });
+  });
 });
 
 module.exports = router;

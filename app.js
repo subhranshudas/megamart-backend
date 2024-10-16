@@ -31,36 +31,36 @@ async function setupSession() {
   try {
     await redisService.initialize();
 
+    const SESSION_TTL = parseInt(process.env.SESSION_TTL);
+    const SESSION_SECRET = process.env.SESSION_SECRET;
+
+    const sessionRedisStore = new RedisStore({
+      client: redisService.getClient(),
+      prefix: "megamart:",
+    });
+
     app.use(
       session({
-        store: new RedisStore({
-          client: redisService.getClient(),
-          prefix: "megamart:",
-        }),
-        secret: process.env.SESSION_SECRET,
+        store: sessionRedisStore,
+        secret: SESSION_SECRET,
         resave: false,
         saveUninitialized: false,
         rolling: true, // Enable session rolling to refresh cookie on each request
+        name: "megamart.sid",
         cookie: {
           httpOnly: true,
           secure: process.env.NODE_ENV === "production",
-          maxAge: 1000 * 60 * 60, // 60 minutes
+          maxAge: 1000 * 60 * SESSION_TTL, // 2 minutes - change as per need
         },
       })
     );
+
+    console.log("express-session middleware set");
   } catch (err) {
     console.error("Failed to initialize Redis and session middleware:", err);
     throw err;
   }
 }
-
-// Routes
-app.get("/", (req, res) => {
-  res.send("Welcome to MegaMart backend!");
-});
-
-// Setup API routes
-app.use("/api/v1/users", userRoutes);
 
 /**
  * APP BOOT PROCESS
@@ -68,14 +68,24 @@ app.use("/api/v1/users", userRoutes);
 async function startApp() {
   try {
     // Validate environment variables
-    validateEnv(["SESSION_SECRET", "MONGODB_URI"]);
+    console.log("Validating ENV_VARIABLES...");
+    validateEnv(["SESSION_SECRET", "SESSION_TTL", "MONGODB_URI"]);
 
     // Setup Redis and session middleware
     await setupSession();
 
     // Connect to MongoDB
     await mongoose.connect(process.env.MONGODB_URI);
-    console.log("Connected to MongoDB Atlas");
+    console.log("MongoDB Atlas Connected!");
+
+    console.log("setting up ROUTES...");
+    // Routes
+    app.get("/", (req, res) => {
+      res.send("Welcome to MegaMart backend!");
+    });
+
+    // Setup API routes
+    app.use("/api/v1/users", userRoutes);
 
     // Start server
     server = app.listen(PORT, () => {

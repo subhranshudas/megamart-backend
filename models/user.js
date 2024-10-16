@@ -21,6 +21,7 @@ const UserSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// has the password before saving
 UserSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
 
@@ -37,7 +38,13 @@ UserSchema.pre("save", async function (next) {
   }
 });
 
+/**
+ *
+ * @param {*} password req body password
+ * @returns
+ */
 UserSchema.methods.comparePassword = function (password) {
+  // this.password = hashed password from mongodb
   return bcrypt.compare(password, this.password);
 };
 
