@@ -1,5 +1,5 @@
 const express = require("express");
-
+const isAuthenticated = require("./middleware/auth");
 const User = require("../models/user");
 const { z } = require("zod");
 
@@ -102,22 +102,56 @@ router.post("/login", async (req, res) => {
 
 // Logout route
 router.post("/logout", (req, res) => {
-  // destroy session
-  req.session.destroy((err) => {
-    if (err) {
-      return res.status(500).json({ message: "Error logging out" });
+  // Check if the user is logged in
+  if (req.session && req.session.userId) {
+    // Destroy the session for the current user
+    req.session.destroy((err) => {
+      if (err) {
+        return res.status(500).json({ message: "Error logging out" });
+      }
+
+      // Clear the session cookie
+      res.clearCookie("megamart.sid", {
+        path: "/",
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+      });
+
+      return res.json({ message: "Logged out successfully" });
+    });
+  } else {
+    return res.status(400).json({ message: "No active session" });
+  }
+});
+
+/**
+ * User profile API route
+ */
+router.get("/profile", isAuthenticated, async (req, res) => {
+  try {
+    // Set cache control headers to prevent caching
+    res.set("Cache-Control", "no-store");
+
+    // Fetch the user data from the database using the userId from the session
+    const user = await User.findById(req.session.userId).select("-password"); // Exclude password from the response
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
     }
 
-    // Clear the session cookie
-    res.clearCookie("megamart.sid", {
-      path: "/",
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+    // Return the user data
+    res.status(200).json({
+      _id: user._id,
+      username: user.username,
+      email: user.email,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
     });
-
-    res.json({ message: "Logged out successfully" });
-  });
+  } catch (err) {
+    console.error("Error fetching user profile:", err);
+    res.status(500).json({ message: "Internal server error" });
+  }
 });
 
 module.exports = router;
