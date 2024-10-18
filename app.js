@@ -1,5 +1,6 @@
 require("dotenv").config();
 
+const cors = require("cors");
 const nodeutils = require("util");
 const express = require("express");
 const mongoose = require("mongoose");
@@ -25,6 +26,29 @@ let server = null;
 
 // convert request body to json
 app.use(express.json());
+
+// Define allowed origins based on the environment
+const allowedOrigins =
+  process.env.NODE_ENV === "production"
+    ? [process.env.PROD_ORIGIN] // Production origin from ENV
+    : [process.env.DEV_ORIGIN]; // Development origin from ENV
+
+// Enable CORS with a whitelist
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+        callback(null, origin);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    allowedHeaders: ["Content-Type"],
+    credentials: true, // if you're using cookies for authentication
+  })
+);
 
 // Initialize Redis and setup session middleware
 async function setupSession() {
