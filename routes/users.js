@@ -1,5 +1,5 @@
 const express = require("express");
-const isAuthenticated = require("./middleware/auth");
+const isAuthenticated = require("../middlewares/auth");
 const User = require("../models/user");
 const { z } = require("zod");
 
